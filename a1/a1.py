@@ -1,5 +1,3 @@
-#! /usr/local/apps/anaconda3-5.3.1/bin/python
-
 import argparse
 import numpy as np
 import scipy.integrate
@@ -71,7 +69,7 @@ def last_nonzero(arr, axis, invalid_val=-1):
     return np.where(mask.any(axis=axis), val, invalid_val)
 
 
-def plot(hz, sec, M, L, K, F, show_phase=None):
+def plot(fig, hz, sec, M, L, K, F, show_phase=None):
 
     """Plot frequency and time domain responses"""
 
@@ -106,12 +104,20 @@ def plot(hz, sec, M, L, K, F, show_phase=None):
 
     # Create plot
 
-    if show_phase is not None:
-        nax = 3
-    else:
-        nax = 2
+    fig.clear()
 
-    fig, ax = plt.subplots(nax, 1, figsize=(11.0, 7.7))
+    if show_phase is not None:
+        ax = [
+            fig.add_subplot(3, 1, 1),
+            fig.add_subplot(3, 1, 2),
+            fig.add_subplot(3, 1, 3)
+        ]
+        ax[1].sharex(ax[0])
+    else:
+        ax = [
+            fig.add_subplot(2, 1, 1),
+            fig.add_subplot(2, 1, 2)
+        ]
 
     ax[0].set_title('Amplitude of frequency domain response to sinusoidal force')
     ax[0].set_xlabel('Frequency/hertz')
@@ -139,7 +145,6 @@ def plot(hz, sec, M, L, K, F, show_phase=None):
     ax[-1].legend(ax[-1].plot(sec, t_response), t_legends)
 
     fig.tight_layout()
-    plt.show()
 
 
 def arg_parser():
@@ -210,7 +215,10 @@ def main():
 
     # Plot results
 
-    plot(hz, sec, M, L, K, F, args.show_phase)
+    fig = plt.figure()
+    plot(fig, hz, sec, M, L, K, F, args.show_phase)
+    fig.canvas.mpl_connect('resize_event', lambda x: fig.tight_layout(pad=2.5))
+    plt.show()
 
 
 if __name__ == '__main__':
