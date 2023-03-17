@@ -1,5 +1,5 @@
 import tkinter
-import matplotlib.pyplot as plt
+import matplotlib
 import matplotlib.backends.backend_tkagg as tkagg
 import numpy as np
 import pathlib
@@ -197,24 +197,31 @@ class GUI:
         self.root = tkinter.Tk()
         self.root.title('A1')
 
-        # Create matplotlib widget
+        # Create matplotlib widgets
 
-        self.fig = plt.figure()
-        canvas = tkagg.FigureCanvasTkAgg(self.fig, master=self.root)
+        self.fig = matplotlib.figure.Figure(figsize=(5, 4), dpi=100)
 
-        canvas.mpl_connect(
+        self.canvas = tkagg.FigureCanvasTkAgg(self.fig, master=self.root)
+        self.canvas.draw()
+
+        self.canvas.get_tk_widget().grid(
+            row=1, column=3, rowspan=102,
+            padx=5, pady=3, sticky='nsew'
+        )
+
+        self.canvas.mpl_connect(
             'resize_event',
             lambda x: self.fig.tight_layout(pad=2.5)
         )
 
-        nav_tbar = tkagg.NavigationToolbar2Tk(canvas, self.root)
-        nav_tbar.update()
-        nav_tbar.grid(row=0, column=3, sticky='nsew')
-
-        canvas.get_tk_widget().grid(
-            row=1, column=3, rowspan=102,
-            padx=5, pady=3, sticky='nsew'
+        nav_tbar = tkagg.NavigationToolbar2Tk(
+            self.canvas,
+            self.root,
+            pack_toolbar=False
         )
+        nav_tbar.update()
+
+        nav_tbar.grid(row=0, column=3, sticky='nsew')
 
         # Create all the parameter labels & entry boxes
 
@@ -381,7 +388,7 @@ class GUI:
             phase
         )
 
-        plt.draw()
+        self.canvas.draw()
 
 
 if __name__ == '__main__':
