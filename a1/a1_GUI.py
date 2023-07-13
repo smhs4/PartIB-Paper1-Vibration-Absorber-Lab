@@ -331,7 +331,7 @@ class GUI:
             zip(
                 labels.split(','),
                 keys.split(','),
-                strict=True
+                # strict=True (removed for Python 3.9 compatibility)
             ),
             start=first_row
         ):
