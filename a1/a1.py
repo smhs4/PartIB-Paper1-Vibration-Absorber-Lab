@@ -5,30 +5,84 @@ import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
 
+def MLKF_building(m, k, l, f, n_tmds=0):
+    """Return mass, damping, and stiffness matrices for a building with the possibility of n TMDs"""
 
-def MLKF_1dof(m1, l1, k1, f1):
+    n_floors = len(m)
 
-    """Return mass, damping, stiffness & force matrices for 1DOF system"""
+    # Create the matrices with room for the TMDs
+    M = np.zeros((n_floors + n_tmds, n_floors + n_tmds))
+    L = np.zeros_like(M)
+    K = np.zeros_like(M)
+    F = np.concatenate((np.array(f), np.zeros(n_tmds)))
+    
 
-    M = np.array([[m1]])
-    L = np.array([[l1]])
-    K = np.array([[k1]])
-    F = np.array([f1])
+    # Populate the diagonal elements for the building
+    for i in range(n_floors):
+        M[i, i] = m[i]
+        
+        # Populate K
+        if i < n_floors-1 :
+            K[i,i] += k[i+1]
+            K[i+1,i+1] += k[i+1]
+            K[i+1,i] -= k[i+1]
+            K[i,i+1] -= k[i+1]
+
+        if i == 0:
+            K[i,i] += k[i]
+
+    
+        # Populate L
+        if i < n_floors-1 :
+            L[i,i] += l[i+1]
+            L[i+1,i+1] += l[i+1]
+            L[i+1,i] -= l[i+1]
+            L[i,i+1] -= l[i+1]
+
+        if i == 0:
+            L[i,i] += l[i]
 
     return M, L, K, F
 
+def add_TMD(M, L, K, m_tmd, k_tmd, l_tmd, floor_num, tmd_idx, m):
 
-def MLKF_2dof(m1, l1, k1, f1, m2, l2, k2, f2):
+    print("recieved:" , L)
+    """Add the effect of a TMD to the building matrices at the specified index"""
+    idx = tmd_idx + len(m)
+    
+    # Set the mass for the TMD
+    M[idx,idx] = m_tmd
 
-    """Return mass, damping, stiffness & force matrices for 2DOF system"""
+    # Set the lambda for the TMD
+    L[idx,idx] += l_tmd
+    print( "1:", L)
+    L[floor_num-1,floor_num-1] += l_tmd
+    print( "2:", L)
+    L[floor_num-1, idx] -= l_tmd
+    print("3:", L)
+    L[idx,floor_num-1] -= l_tmd
+    print("4:", L)
+    
+    # Set the K for the TMD
+    K[idx,idx] += k_tmd
+    K[floor_num-1,floor_num-1] += k_tmd
+    K[floor_num-1, idx] -= k_tmd
+    K[idx,floor_num-1] -= k_tmd
 
-    M = np.array([[m1, 0], [0, m2]])
-    L = np.array([[l1+l2, -l2], [-l2, l2]])
-    K = np.array([[k1+k2, -k2], [-k2, k2]])
-    F = np.array([f1, f2])
+
+    return M, L, K
+
+
+def build_matrix(m, l, k, f, m_tmds, l_tmds, k_tmds, floor_tmds):
+    n_tmds = len(m_tmds)
+    M, L, K, F = MLKF_building(m, k, l, f, n_tmds)
+
+    if n_tmds > 0:
+        for i in range(len(m_tmds)) :
+            M, L, K = add_TMD(M, L, K, m_tmds[i], k_tmds[i], l_tmds[i], floor_tmds[i], i, m)
+            print("here:" , L)
 
     return M, L, K, F
-
 
 def freq_response(w_list, M, L, K, F):
 
@@ -148,77 +202,38 @@ def plot(fig, hz, sec, M, L, K, F, show_phase=None):
 
     fig.tight_layout()
 
-
-def arg_parser():
-    ap = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='''
-            For a system with one or two degrees of freedom, show the
-            frequency domain response to an applied sinusoidal force,
-            and the time domain response to an step force.
-    ''')
-
-    ap.add_argument('--m1', type=float, default=7.88, help='Mass 1')
-    ap.add_argument('--l1', type=float, default=3.96, help='Damping 1')
-    ap.add_argument('--k1', type=float, default=4200, help='Spring 1')
-    ap.add_argument('--f1', type=float, default=0.25, help='Force 1')
-
-    ap.add_argument('--m2', type=float, default=None, help='Mass 2')
-    ap.add_argument('--l2', type=float, default=1, help='Damping 2')
-    ap.add_argument('--k2', type=float, default=106.8, help='Spring 2')
-    ap.add_argument('--f2', type=float, default=0, help='Force 2')
-
-    ap.add_argument(
-        '--hz', type=float, nargs=2, default=(0, 5),
-        help='Frequency range'
-    )
-    ap.add_argument(
-        '--sec', type=float, default=30,
-        help='Time limit'
-    )
-
-    ap.add_argument(
-        '--show-phase', type=int, nargs='?', const=0,
-        help='''Show the frequency domain phase response(s).
-        If this option is given without a value then phases are shown
-        relative to the excitation.
-        If a value is given then phases are shown relative to the
-        phase of the mass with that number.
-    ''')
-
-    return ap
-
-
 def main():
 
     """Main program"""
 
-    # Read command line
+    # Enter values of m, k and lamda for each floor, make sure the m, k, l(ambda) and f arrays all have the same length with the each index 
+    # correspoinding to the values of each floor.
 
-    ap = arg_parser()
-    args = ap.parse_args()
+    m = [1.83,1.83,1.83]
+    k = [4200,4200,4200]
+    l = [1, 1, 1 ]
+    f = [0.5, 0, 0]
 
-    # Generate matrices describing the system
+    # Here you can add the value of the tuned mass dampners that you want. again make sure the four arrays have the same length.
+    m_tmds = [0.15]
+    l_tmds = [1]
+    k_tmds = [80]
+    floor_tmds = [1] # This allows you to choose which floor you want to place the tuned mass damper on
 
-    if args.m2 is None:
-        M, L, K, F = MLKF_1dof(
-            args.m1, args.l1, args.k1, args.f1
-        )
-    else:
-        M, L, K, F = MLKF_2dof(
-            args.m1, args.l1, args.k1, args.f1,
-            args.m2, args.l2, args.k2, args.f2
-        )
-
+    M, L, K, F = build_matrix(m, l, k, f, m_tmds, l_tmds, k_tmds, floor_tmds)
+    print("M:",M)
+    print("L:", L)
+    print("K:", K)
+    
     # Generate frequency and time arrays
 
-    hz = np.linspace(args.hz[0], args.hz[1], 10001)
-    sec = np.linspace(0, args.sec, 10001)
+    hz = np.linspace(0, 15, 10001)
+    sec = np.linspace(0, 30, 10001)
 
     # Plot results
 
     fig = plt.figure()
-    plot(fig, hz, sec, M, L, K, F, args.show_phase)
+    plot(fig, hz, sec, M, L, K, F)
     fig.canvas.mpl_connect('resize_event', lambda x: fig.tight_layout(pad=2.5))
     plt.show()
 
